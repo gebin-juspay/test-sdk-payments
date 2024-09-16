@@ -56,6 +56,8 @@ HOME_PATH=$(get_absolute_path "../")
 TEMPERORY_SDK_PATH=$(get_absolute_path "$HOME_PATH/temp-$SDK_NAME")  # Directory with contents to move
 TARGET_REPO_PATH=$(get_absolute_path "$HOME_PATH/$SDK_NAME")     # Directory to move contents to
 REMOTE_URL="git@github.com:gebin-juspay/$SDK_NAME.git"
+last_commit_message=$(git log -1 --pretty=%B)
+
 
 
 echo "gebin home $HOME_PATH"
@@ -198,7 +200,7 @@ function setup_and_push_repo() {
     git remote add origin "$REMOTE_URL"
 
     echo "Pushing to the new remote repository..."
-    git push -u origin master
+    git push -u -f origin master
 }
 
 
@@ -216,10 +218,10 @@ function commit_and_push_changes() {
     git add .
 
     echo "Committing changes..."
-    git commit -m "Update repository contents"
+    git commit -m "$last_commit_message"
 
     echo "Pushing changes to the remote repository..."
-    git push origin master
+    git push -u origin main
 }
 
 
