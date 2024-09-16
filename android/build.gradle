@@ -1,0 +1,137 @@
+import com.android.Version
+
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+        maven { url "https://maven.juspay.in/jp-build-packages/hyper-sdk/" }
+    }
+
+    dependencies {
+        classpath 'com.android.tools.build:gradle:4.0.1'
+        classpath 'in.juspay:hypersdk.plugin:2.0.8'
+    }
+}
+
+def isNewArchitectureEnabled() {
+    return rootProject.hasProperty("newArchEnabled") && rootProject.getProperty("newArchEnabled") == "true"
+}
+
+apply plugin: 'com.android.library'
+apply plugin: 'hypersdk.plugin'
+
+
+def appProject = rootProject.allprojects.find { it.plugins.hasPlugin('com.android.application') }
+
+if (isNewArchitectureEnabled()) {
+    apply plugin: "com.facebook.react"
+}
+
+def getExtOrDefault(name) {
+    return rootProject.ext.has(name) ? rootProject.ext.get(name) : project.properties['HyperSdkReact_' + name]
+}
+
+def getExtOrIntegerDefault(name) {
+    return rootProject.ext.has(name) ? rootProject.ext.get(name) : (project.properties['HyperSdkReact_' + name]).toInteger()
+}
+
+android {
+    def agpVersion = Version.ANDROID_GRADLE_PLUGIN_VERSION
+    // Check AGP version for backward compatibility w/react-native versions still on gradle plugin 6
+    if (agpVersion.tokenize('.')[0].toInteger() >= 7) {
+        namespace = "in.juspay.hypersdkreact"
+    }
+
+    compileSdkVersion getExtOrIntegerDefault('compileSdkVersion')
+
+    defaultConfig {
+        minSdkVersion getExtOrIntegerDefault('minSdkVersion')
+        targetSdkVersion getExtOrIntegerDefault('targetSdkVersion')
+        buildConfigField "boolean", "IS_NEW_ARCHITECTURE_ENABLED", isNewArchitectureEnabled().toString()
+        consumerProguardFiles "consumer-rules.pro"
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+
+    lintOptions {
+        disable 'GradleCompatible'
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+}
+
+repositories {
+    mavenCentral()
+    google()
+}
+
+
+if (isNewArchitectureEnabled()) {
+    react {
+        jsRootDir = file("../src/")
+        libraryName = "_JuspaySDKReact"
+        codegenJavaPackageName = "in._juspay"
+    }
+}
+
+static def mostRecentVersion(List<String> versions) {
+    return versions.sort(false) { a, b ->
+        [a, b]*.tokenize('-rc')*.join('')*.tokenize('.')*.collect {
+            it as int
+        }.with { u, v ->
+            [u, v].transpose().findResult { x, y -> x <=> y ?: null } ?: u.size() <=> v.size()
+        }
+    }[-1]
+}
+
+static def getHyperSDKVersion(rootProject) {
+    def hyperSdkVersion = '2.1.33'
+    if (!rootProject.hasProperty('hyperSDKVersion')) {
+        return hyperSdkVersion
+    }
+    def rootVersion = rootProject.hyperSDKVersion
+    hyperSdkVersion = mostRecentVersion([rootVersion, hyperSdkVersion])
+    if (hyperSdkVersion != rootVersion) {
+        System.out.println("Ignoring the overriden SDK version present in root build.gradle ($rootVersion), as there is a newer version present in the SDK ($hyperSdkVersion).")
+    }
+    return hyperSdkVersion
+}
+
+static def getExcludedMicroSdks(rootProject) {
+    if (!rootProject.hasProperty('excludedMicroSDKs')) {
+        return []
+    }
+    return rootProject.excludedMicroSDKs
+}
+
+static def getClientId(rootProject) {
+    if (!rootProject.hasProperty('clientId')) {
+        throw new GradleException("clientId parameter is required in ext block of root build.gradle")
+    }
+    return rootProject.clientId
+}
+
+dependencies {
+    // For < 0.71, this will be from the local maven repo
+    // For > 0.71, this will be replaced by `com.facebook.react:react-android:$version` by react gradle plugin
+    //noinspection GradleDynamicVersion
+    implementation 'com.facebook.react:react-native:+'
+    implementation 'androidx.appcompat:appcompat:1.0.0'
+    compileOnly "in.juspay:hypercheckoutlite:2.2.0-xtest.09"
+    implementation 'in.juspay:_juspaywrappersdk:2.2.0-xtest.09'
+}
+
+hyperSdkPlugin {
+    clientId = 'geddit'
+    sdkVersion = '2.2.0-xtest.09'
+}
+
+// if(rootProject.hasProperty('hyperAssetVersion')) {
+//     hyperSdkPlugin.assetVersion = rootProject.hyperAssetVersion
+// }
